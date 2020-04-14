@@ -6,6 +6,17 @@ cd build
 cmake ..
 
 window下生成DevFtGather.sln解决方案,DevFtGather为库文件生成的工程
+Linux下生成Makefile，运行make即可获得libDevFtGather.a
+
+编译Demo方式：
+cd demo
+mkdir build 
+cd build
+cmake ..
+
+window下生成DevFtGather.sln解决方案,DevFtGatherDemo为测试的工程
+Linux下生成Makefile，运行make即可获得DevFtGatherDemo
+
 
 
 

@@ -1,4 +1,4 @@
-#include "DevFtGather.h"
+﻿#include "DevFtGather.h"
 #include "iostream"
 
 using namespace std;

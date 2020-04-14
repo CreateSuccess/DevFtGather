@@ -1,7 +1,4 @@
-﻿#include "DevFtGather.h"
-#include "arithmetic.h"
-
-#if WIN32
+﻿#if WIN32
 #include <winsock2.h>
 #include <iphlpapi.h>
 #include <tchar.h>
@@ -9,10 +6,16 @@
 #include <stdio.h>
 #pragma comment (lib,"iphlpapi")
 #pragma comment (lib,"Ws2_32")
-
 #else
-
+#include <sys/ioctl.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <net/if.h>
+#include <unistd.h>
 #endif
+#include <string.h>
+#include "DevFtGather.h"
+#include "arithmetic.h"
 
 
 #ifdef _MSC_VER
@@ -91,11 +94,10 @@ int DevFtGather::GetDevFt(std::string &strDevFt)
 
 std::string DevFtGather::GetDevFtInfoMac()
 {
+   neb::CJsonObject oJson;
+#if WIN32   
    MIB_IPADDRTABLE* pIPAddrTable = (MIB_IPADDRTABLE*)malloc(sizeof(MIB_IPADDRTABLE));
    ULONG dwSize = 0,dwRetVal = 0;
-   neb::CJsonObject oJson;
-
-   oJson.Add("paramType", "MAC");
 
    if (GetIpAddrTable(pIPAddrTable,&dwSize,0)==ERROR_INSUFFICIENT_BUFFER)
    {
@@ -131,18 +133,48 @@ std::string DevFtGather::GetDevFtInfoMac()
         }
     }
     free(pIPAddrTable);
+#else
+    struct ifreq ifreq;
+    int sock;
+    char pcMac[1024] ={0};
+    
+    try
+    {
+        if((sock=socket(AF_INET,SOCK_STREAM,0)) < 0)
+        {
+            throw sock;
+        }
+        strcpy(ifreq.ifr_name, "eth0");
+        if(ioctl(sock,SIOCGIFHWADDR,&ifreq) < 0)
+        {
+            throw -1; 
+        }
+        snprintf(pcMac, sizeof(pcMac), "%02x:%02x:%02x:%02x:%02x:%02x",
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[0],
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[1],
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[2],
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[3],
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[4],
+                        (unsigned char)ifreq.ifr_hwaddr.sa_data[5]);
+        oJson.Add("paramValue", pcMac);                  
+    }
+    catch(int errCode)
+    {
+        oJson.Add("paramValue", "NULL");  
+    }                 
+#endif
+    oJson.Add("paramType", "MAC");
     return oJson.ToString();
 }
 
 std::string DevFtGather::GetDevFtInfoCpuId()
 {
+    neb::CJsonObject oJson;
+#if WIN32    
     std::string strCPUId;
     unsigned long s1, s2;
     char buf[32] = {0};
-    neb::CJsonObject oJson;
 
-    oJson.Add("paramType", "CPUID");
-    
     __asm{
         mov eax,01h   //eax=1:取CPU序列号
         xor edx,edx
@@ -180,23 +212,53 @@ std::string DevFtGather::GetDevFtInfoCpuId()
         strCPUId += buf;
     }
     oJson.Add("paramValue", strCPUId);
+#else
+   unsigned long eax = 0, ebx = 0, ecx = 0, edx = 0;
+   std::string strCPUId;
+   char buf[32] = {0};
+
+   __asm__ (
+    "cpuid"
+    :"=a"(eax),"=b"(ebx),"=c"(ecx),"=d"(edx):"a"(2));
+
+    if (eax) {
+        memset(buf, 0, 32);
+        snprintf(buf, 32, "%08X", eax);
+        strCPUId += buf;
+    }
+    if (ebx) {
+        memset(buf, 0, 32);
+        snprintf(buf, 32, "%08X", ebx);
+        strCPUId += buf;
+    }
+    if (ecx) {
+        memset(buf, 0, 32);
+        snprintf(buf, 32, "%08X", ecx);
+        strCPUId += buf;
+    }
+    if (edx) {
+        memset(buf, 0, 32);
+        snprintf(buf, 32, "%08X", edx);
+        strCPUId += buf;
+    }                
+    oJson.Add("paramValue", strCPUId);
+#endif
+    oJson.Add("paramType", "CPUID");
     return oJson.ToString();
 }
 
 std::string DevFtGather::GetDevFtInfoUUID()
 {
+    neb::CJsonObject oJson;
+#if WIN32    
     const long MAX_COMMAND_SIZE = 10000; // 命令行输出缓冲大小
 #ifdef UNICODE
 WCHAR szFetCmd[] = L"wmic csproduct get UUID"; // 获取BOIS命令行   
 #else
 	LPSTR szFetCmd= "wmic csproduct get UUID" ; // 获取BOIS命令行   
-#endif // !UNICODE
-     
+#endif // !UNICODE  
     const std::string strEnSearch = "UUID"; // 主板序列号的前导信息
-    neb::CJsonObject oJson;
     char lpszBaseBoard[1024] = {0};
-
-    oJson.Add("paramType", "CPUID");
 
     BOOL   bret = FALSE;
     HANDLE hReadPipe = NULL; //读取管道
@@ -292,6 +354,53 @@ WCHAR szFetCmd[] = L"wmic csproduct get UUID"; // 获取BOIS命令行
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
     oJson.Add("paramValue", lpszBaseBoard);
+#else
+	pid_t	pid;
+	int	ret	= 0;
+	int	fd[2]	= { 0 };
+ 
+    try
+    {
+        ret = pipe( fd );
+        if ( ret == -1 )
+        {
+            printf("1\n");
+            throw -1;
+        }
+    
+        pid = vfork();
+        if ( pid < 0 )
+        {
+             printf("2\n");
+            throw -1;
+        }
+        else if ( pid == 0 )
+        {
+            char str[50] = "dmidecode -s system-serial-number";
+		    dup2( fd[1], 1 );                       /* 标准输出重定向到管道的写端 */     
+            execlp( "/bin/sh", "sh", "-c", str, NULL );
+        }
+        char result[100] = {0};
+        char msg[100] = {0};
+        read( fd[0], result, sizeof(result) );  /* 从管道的读端读取数据 */
+
+
+        snprintf( msg, 100, "%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c:%c%c",
+            result[7], result[8], result[10], result[11], result[13], result[14], result[16], result[17],
+            result[19], result[20], result[22], result[23], result[25],
+            result[26], result[28], result[29], result[31], result[32],
+            result[34], result[35], result[37], result[38], result[40],
+            result[41], result[43], result[44], result[46], result[47],
+            result[49], result[50], result[52], result[53] );
+        oJson.Add("paramValue", msg);
+    }
+    catch(int errCode)
+    {
+         oJson.Add("paramValue", "NULL");
+    }
+
+#endif
+    oJson.Add("paramType", "UUID");
     return oJson.ToString();
 }
 
