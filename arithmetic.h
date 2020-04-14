@@ -1,4 +1,4 @@
-ifndef ARITHMETIC_H
+﻿#ifndef ARITHMETIC_H
 #define ARITHMETIC_H
 
 /* SM3算法产生的哈希值大小（单位：字节） */

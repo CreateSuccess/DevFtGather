@@ -1,4 +1,4 @@
-#ifndef __DEV_FT_GATHER_H
+﻿#ifndef __DEV_FT_GATHER_H
 #define __DEV_FT_GATHER_H
 
 /***************************************************************************

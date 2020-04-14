@@ -1,4 +1,4 @@
-/*************************************************
+﻿/*************************************************
 Copyright (C), 2009 Qasky Co., Ltd
 File name: qcard_arithmetic.c
 Author: Jianbin Wang    Version:  1.0.0      Date: 2019年7月16日

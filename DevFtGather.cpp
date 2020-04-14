@@ -1,4 +1,4 @@
-#include "DevFtGather.h"
+﻿#include "DevFtGather.h"
 #include "arithmetic.h"
 
 #if WIN32
@@ -185,8 +185,13 @@ std::string DevFtGather::GetDevFtInfoCpuId()
 
 std::string DevFtGather::GetDevFtInfoUUID()
 {
-    const long MAX_COMMAND_SIZE = 10000; // 命令行输出缓冲大小    
-    WCHAR szFetCmd[] = L"wmic csproduct get UUID"; // 获取BOIS命令行    
+    const long MAX_COMMAND_SIZE = 10000; // 命令行输出缓冲大小
+#ifdef UNICODE
+WCHAR szFetCmd[] = L"wmic csproduct get UUID"; // 获取BOIS命令行   
+#else
+	LPSTR szFetCmd= "wmic csproduct get UUID" ; // 获取BOIS命令行   
+#endif // !UNICODE
+     
     const std::string strEnSearch = "UUID"; // 主板序列号的前导信息
     neb::CJsonObject oJson;
     char lpszBaseBoard[1024] = {0};
