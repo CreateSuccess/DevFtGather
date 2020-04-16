@@ -106,31 +106,32 @@ std::string DevFtGather::GetDevFtInfoMac()
    }
    if((dwRetVal=GetIpAddrTable(pIPAddrTable,&dwSize,0))==NO_ERROR)
    {
-        ULONG ulHostIp=ntohl(pIPAddrTable->table[0].dwAddr);
-        // 获取主机ip地址和子网掩码
-        ULONG ulHostMask=ntohl(pIPAddrTable->table[0].dwMask);
-        ULONG J = (~ulHostMask);
-        for(ULONG I=1;I<(~ulHostMask);I++)
-        {
-            static ULONG uNo=0;
-            HRESULT hr;
-            IPAddr ipAddr;
-            ULONG pulMac[2];
-            ULONG ullen;
-            ipAddr=htonl(I+(ulHostIp&ulHostMask));
-            memset(pulMac,0xff,sizeof(pulMac));
-            ullen=6;
-            hr=SendARP(ipAddr,0,pulMac,&ullen);// 探测主机MAC地址
-            if(ullen==6)
-            {
-                PBYTE pbHexMac=(PBYTE)pulMac;
-                unsigned char * strIpAddr=(unsigned char *)(&ipAddr);
-                char pcMac[1024] ={0};
-                snprintf(pcMac, sizeof(pcMac), "%02X:%02X:%02X:%02X:%02X:%02X", pbHexMac[0],pbHexMac[1],pbHexMac[2],pbHexMac[3],pbHexMac[4],pbHexMac[5]);
-                oJson.Add("paramValue", pcMac);
-                break;
-            }
-        }
+	   for (int iTable = 0; iTable < pIPAddrTable->dwNumEntries; iTable++)
+	   {
+		   ULONG ulHostIp = ntohl(pIPAddrTable->table[iTable].dwAddr);
+		   // 获取主机ip地址和子网掩码
+		   ULONG ulHostMask = ntohl(pIPAddrTable->table[iTable].dwMask);
+		   ULONG J = (~ulHostMask);
+		   ULONG I = 1;
+		   static ULONG uNo = 0;
+		   HRESULT hr;
+		   IPAddr ipAddr;
+		   ULONG pulMac[2];
+		   ULONG ullen;
+		   ipAddr = htonl(I + (ulHostIp&ulHostMask));
+		   memset(pulMac, 0xff, sizeof(pulMac));
+		   ullen = 6;
+		   hr = SendARP(ipAddr, 0, pulMac, &ullen);// 探测主机MAC地址
+		   if (ullen == 6)
+		   {
+			   PBYTE pbHexMac = (PBYTE)pulMac;
+			   unsigned char * strIpAddr = (unsigned char *)(&ipAddr);
+			   char pcMac[1024] = { 0 };
+			   snprintf(pcMac, sizeof(pcMac), "%02X:%02X:%02X:%02X:%02X:%02X", pbHexMac[0], pbHexMac[1], pbHexMac[2], pbHexMac[3], pbHexMac[4], pbHexMac[5]);
+			   oJson.Add("paramValue", pcMac);
+			   break;
+		   }
+	   }
     }
     free(pIPAddrTable);
 #else
@@ -310,7 +311,7 @@ WCHAR szFetCmd[] = L"wmic csproduct get UUID"; // 获取BOIS命令行
     }
 
     //4.读取返回的数据
-    WaitForSingleObject(pi.hProcess, 200);
+    WaitForSingleObject(pi.hProcess, 2000);
     bret = ReadFile(hReadPipe, szBuffer, MAX_COMMAND_SIZE, &count, 0);
     if (!bret) {
         CloseHandle(hWritePipe);
